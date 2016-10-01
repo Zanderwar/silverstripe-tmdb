@@ -12,7 +12,7 @@ class APIService extends \RestfulService {
      *
      * @var string
      */
-    protected static $api_url = "http://api.themoviedb.org/3/";
+    protected static $api_url = "http://api.themoviedb.org/3/"; // version 3
 
     /**
      * Max Requests
@@ -41,7 +41,12 @@ class APIService extends \RestfulService {
      * @var string
      */
     protected static $endpoint;
-    
+
+    /**
+     * @var int
+     */
+    protected $cache_expire = 0;
+
     /**
      * APIService constructor.
      *
@@ -54,7 +59,6 @@ class APIService extends \RestfulService {
             user_error("You must provide your own TheMovieDB.org API key");
         }
 
-
         self::$api_key = $config->tmdb_api_key;
         parent::__construct(self::$api_url, $expiry);
     }
@@ -64,7 +68,7 @@ class APIService extends \RestfulService {
      *
      * @return \DataObject
      */
-    public function getThrottle() {
+    private function getThrottle() {
         $throttle = \Throttle::get()->first();
 
         if (!$throttle) {
@@ -79,7 +83,7 @@ class APIService extends \RestfulService {
      *
      * @return bool
      */
-    public function incThrottle() {
+    private function incThrottle() {
         $throttle = $this->getThrottle();
         $throttle->Requests = $throttle->Requests++;
         $throttle->LastRequest = time();
@@ -91,48 +95,60 @@ class APIService extends \RestfulService {
      * Pauses script execution until another request can be made. Open to opinions or a PR?
      *
      * @note This is only used by server, and "should not" at any point in time be invoked by a visitor
+     * @label help-wanted
      *
      * @return void
      */
-    public function runThrottle() {
-        $throttle = $this->getThrottle();
+    private function runThrottle() {
 
         $i = 0;
-        while (($throttle->Requests >= self::$max_requests) && ((time() - $throttle->LastRequest) <= self::$max_requests_in_duration))
+        $trigger = false;
+        while (($this->getThrottle()->Requests >= self::$max_requests) && ((time() - $this->getThrottle()->LastRequest) <= self::$max_requests_in_duration))
         {
+            $trigger = true; // should this ever be true, then requests will reset back to zero once the loop ends;
             $i++;
+        }
+
+        if ($trigger) {
+            $this->getThrottle()->Requests = 0;
+            $this->getThrottle()->write();
         }
 
         return;
     }
 
     /**
-     * @param string $subURL
-     * @param string $method
-     * @param null   $data
-     * @param null   $headers
-     * @param array  $curlOptions
-     *
      * @return \RestfulService_Response
      */
-    public function request($subURL = '', $method = "GET", $data = null, $headers = null, $curlOptions = array()) {
+    public function request() {
 
-        $this->runThrottle();
+        $this->runThrottle(); // pauses script execution until another request can be made
 
-        $params = parse_str($this->queryString);
+        // convert parents query string back into an array
+        parse_str($this->queryString, $params);
 
+        // if null create the array
         if (is_null($params)) {
             $params = array();
         }
 
+        // if api_key is not in the array, add it
         if (!array_key_exists("api_key", $params)) {
             $params['api_key'] = static::$api_key;
             $this->setQueryString($params);
         }
 
-        $result = parent::request($subURL, $method, $data, $headers, $curlOptions);
+        // fetch a response
+        $result = parent::request();
 
+        // increment the throttle counter
         $this->incThrottle();
+
+        // check if the request is unauthorized (usually bad api key)
+        if ($result->getStatusCode() == 401) {
+            $unauthorized = json_decode($result->getBody());
+            throw new \RuntimeException("TheMovieDB.org said: " . $unauthorized->status_message);
+        }
 
         return $result;
     }
