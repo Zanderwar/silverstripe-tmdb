@@ -266,6 +266,7 @@ class Pager
         // setup required class variables
         self::$current_page      = $array[ "page" ];
         self::$count             = $array[ "total_results" ];
+        self::$total_pages       = $array[ "total_pages" ];
         self::$current_page_data = $array;
 
         return $array;
