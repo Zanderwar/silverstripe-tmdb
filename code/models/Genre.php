@@ -1,8 +1,8 @@
 <?php
 
-class Genres extends DataObject {
+class Genre extends DataObject {
     private static $db = array(
-        "GenreId" => "Int",
+        "GenreId" => "Int", // used in further requests to TheMovieDB.org
         "Name" => "Varchar"
     );
 

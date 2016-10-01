@@ -1,5 +1,5 @@
 <?php
-class Movies extends DataObject {
+class Movie extends DataObject {
 
     private static $db = array(
         "Adult" => "Int(0)",
@@ -7,7 +7,7 @@ class Movies extends DataObject {
         "BelongsToCollection" => "Varchar",
         "Budget" => "Int",
         "Homepage" => "Varchar",
-        "TMDBId" => "Int",
+        "MovieId" => "Int", // used in further requests to TheMovieDB.org
         "IMDBId" => "Int",
         "OriginalLanguage" => "Varchar(3)",
         "OriginalTitle" => "Varchar",
@@ -33,9 +33,8 @@ class Movies extends DataObject {
      * @var array
      */
     private static $belongs_many_many = array(
-        "Genres" => "Genre",
-        "ProductionCompanies" => "ProductionCompany"
+        "ProductionCompanies" => "ProductionCompany",
+        "Genres" => "Genre"
     );
-
 
 }
