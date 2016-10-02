@@ -37,6 +37,20 @@ class Pager
     protected static $total_pages = NULL;
 
     /**
+     * The page to start on (if sync is interrupted, we can grab last page from here)
+     *
+     * @var int
+     */
+    protected static $starting_page;
+
+    /**
+     * The key used for SyncMemory to recover from sync interruption
+     *
+     * @var string
+     */
+    protected static $memory_key;
+
+    /**
      * Current Page
      *
      * @var int|null
@@ -46,7 +60,7 @@ class Pager
     /**
      * Stores the TheMovieDB.org response for the current page
      *
-     * @var
+     * @var array
      */
     protected static $current_page_data;
 
@@ -107,7 +121,7 @@ class Pager
      *
      * @todo could probably clean this up with a DRY helper as it's prev() but in reverse
      *
-     * @return \ArrayList
+     * @return array
      */
     public function next()
     {
@@ -118,6 +132,22 @@ class Pager
             return FALSE;
         }
 
+        // we record the current page here in SyncMemory before incrementing, in case sync is interrupted half
+        // way through next page. We don't care for the first page for obvious reasons
+        if (isset(static::$memory_key) && $current_page > 1) {
+            $mem_key = static::$memory_key;
+            $memory = \SyncMemory::get()->first();
+
+            if (!$memory) {
+                $memory = \SyncMemory::create();
+            }
+
+            /** @todo work out how to check if $mem_key is actually a column */
+            $memory->{$mem_key} = $current_page;
+            $memory->write();
+        }
+
+        // increment and continue building page request
         $current_page++;
         static::$query_string = array_merge(
             static::$query_string,
@@ -188,12 +218,12 @@ class Pager
     /**
      * Init the pager and loads the first page into memory
      *
-     * @param array $format_vars   Only provide this if you have defined `$endpoint_format` in your class
-     *                             Example:
-     *                             ```
-     *                             class YourClass extends Pager {
-     *                             $endpoint_format = "genres/{genre_id}/movies";
-     *                             }
+     * @param array $format_vars        Only provide this if you have defined `$endpoint_format` in your class
+     *                                  Example:
+     *                                  ```
+     *                                  class YourClass extends Pager {
+     *                                  $endpoint_format = "genres/{genre_id}/movies";
+     *                                  }
      *
      *                           $genre = \Genre::get()->first();
      *                           YourClass::init(
@@ -203,10 +233,17 @@ class Pager
      *                           );
      *                           ```
      *
+     * @param null  $max_execution_time Sets the maximum execution time for a script. Default: php.ini setting
+     *
      * @return $this
      */
-    public function init($format_vars = array())
+    public function init($format_vars = array(), $max_execution_time = NULL)
     {
+        // I would like to discuss this if anyone has something constructive
+        if (!is_null($max_execution_time) && is_integer($max_execution_time)) {
+            set_time_limit($max_execution_time);
+        }
+
         // if the developer provides this function with $format_vars, but no $endpoint_format has been provided by the
         // inheriting class then throw error
         if (!empty($format_vars) && !isset(static::$endpoint_format)) {
@@ -233,7 +270,7 @@ class Pager
         }
 
         // load first page into memory
-        self::getFirstPage();
+        self::getFirstOrStartingPage();
 
         return $this;
     }
@@ -243,15 +280,27 @@ class Pager
      *
      * @return int|null
      */
-    public function getFirstPage()
+    public function getFirstOrStartingPage()
     {
         // set endpoint
         $this->APIService->setEndpoint(static::$endpoint);
 
         // set query string
-        $this->APIService->setQueryString(
-            static::$query_string
-        );
+        if (isset(static::$starting_page)) {
+            $this->APIService->setQueryString(
+                array_merge(
+                    static::$query_string,
+                    array(
+                        "page" => static::$starting_page
+                    )
+                )
+            );
+        }
+        else {
+            $this->APIService->setQueryString(
+                static::$query_string
+            );
+        }
 
         // fetch a response
         $response = $this->APIService->request();
