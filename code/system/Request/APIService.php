@@ -50,9 +50,9 @@ class APIService extends \RestfulService {
     /**
      * APIService constructor.
      *
-     * @param null   $expiry
+     * @param null   $cache_expiry
      */
-    function __construct($expiry=NULL){
+    function __construct($cache_expiry=NULL){
         $config = \SiteConfig::current_site_config();
 
         if (!isset($config->tmdb_api_key) || !strlen($config->tmdb_api_key)) {
@@ -60,7 +60,7 @@ class APIService extends \RestfulService {
         }
 
         self::$api_key = $config->tmdb_api_key;
-        parent::__construct(self::$api_url, $expiry);
+        parent::__construct(self::$api_url, $cache_expiry);
     }
 
     /**
@@ -85,7 +85,17 @@ class APIService extends \RestfulService {
      */
     private function incThrottle() {
         $throttle = $this->getThrottle();
-        $throttle->Requests = $throttle->Requests++;
+
+        $requests = $throttle->Requests;
+
+        // if this is the first request getting made ($requests == 0) then let our model know
+        if (!(int)$requests) {
+            $throttle->FirstRequest = time();
+        }
+
+        $requests++;
+
+        $throttle->Requests = $requests;
         $throttle->LastRequest = time();
 
         return ($throttle->write()) ? true : false;
@@ -101,19 +111,31 @@ class APIService extends \RestfulService {
      */
     private function runThrottle() {
 
+        // give the little guy something to count
         $i = 0;
-        $trigger = false;
-        while (($this->getThrottle()->Requests >= self::$max_requests) && ((time() - $this->getThrottle()->LastRequest) <= self::$max_requests_in_duration))
+
+        $diff = time() - $this->getThrottle()->FirstRequest;
+
+        // rodeo time...
+        while (($this->getThrottle()->Requests >= self::$max_requests) || $diff >= self::$max_requests_in_duration)
         {
-            $trigger = true; // should this ever be true, then requests will reset back to zero once the loop ends;
+            $diff = time() - $this->getThrottle()->FirstRequest; // im repeating myself, can't remove it either - looks can be deceiving :(
+
+            if ($diff >= self::$max_requests_in_duration) {
+                // the app has been a good boy and has been punished long enough!
+                $throttle = $this->getThrottle();
+                $throttle->Requests = 0;
+                $throttle->write();
+
+                // free it from its misery!
+                break;
+            }
+
+            // poor little guy, wonder how high he has to count before he BREAKS!
             $i++;
         }
 
-        if ($trigger) {
-            $this->getThrottle()->Requests = 0;
-            $this->getThrottle()->write();
-        }
-
+        // oh we are all types of good to go right now
         return;
     }
 
