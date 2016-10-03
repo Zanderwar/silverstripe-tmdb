@@ -8,6 +8,7 @@
  */
 class SyncMemory extends DataObject {
     protected static $db = array(
-        "Movies" => "Int"
+        "Movies" => "Int",
+        "Genre" => "Int"
     );
 }

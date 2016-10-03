@@ -5,7 +5,7 @@ namespace TMDB\Request;
  * Class APIService
  * @package TMDB\Request
  */
-class APIService extends \RestfulService {
+class TMDBService extends \RestfulService {
 
     /**
      * TheMovieDB.org API Url
@@ -53,13 +53,13 @@ class APIService extends \RestfulService {
      * @param null   $cache_expiry
      */
     function __construct($cache_expiry=NULL){
-        $config = \SiteConfig::current_site_config();
+        $api_key = \Config::inst()->get("TMDB", "api_key");
 
-        if (!isset($config->tmdb_api_key) || !strlen($config->tmdb_api_key)) {
+        if (!isset($api_key) || !strlen($api_key)) {
             user_error("You must provide your own TheMovieDB.org API key");
         }
 
-        self::$api_key = $config->tmdb_api_key;
+        self::$api_key = $api_key;
         parent::__construct(self::$api_url, $cache_expiry);
     }
 
@@ -142,7 +142,7 @@ class APIService extends \RestfulService {
     /**
      * @return \RestfulService_Response
      */
-    public function request() {
+    public function request($subURL = '', $method = "GET", $data = null, $headers = null, $curlOptions = array()) {
 
         $this->runThrottle(); // pauses script execution until another request can be made
 

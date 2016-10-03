@@ -1,7 +1,7 @@
 <?php
 namespace TMDB;
 
-use TMDB\Request\APIService;
+use TMDB\Request\TMDBService;
 
 /**
  * Class Genre
@@ -11,9 +11,9 @@ class Genres
 {
 
     /**
-     * @var Request\APIService
+     * @var Request\TMDBService
      */
-    protected $APIService;
+    protected $TMDBService;
 
     /**
      * @var array
@@ -43,7 +43,7 @@ class Genres
      */
     public function __construct()
     {
-        $this->APIService = new APIService();
+        $this->APIService = new TMDBService();
     }
 
     /**
@@ -54,16 +54,73 @@ class Genres
      *
      * @return array
      */
-    public function fetch($language = "en-US", $assoc = false)
+    public function getList($language = null, $assoc = true)
     {
+        if (is_null($language)) {
+            $language = str_replace("_", "-", \i18n::get_locale());
+        }
+
         $this->APIService->setEndpoint("genre/movie/list");
         $this->APIService->setQueryString(
             array(
                 "language" => $language
             )
         );
+
         return $result = json_decode($this->APIService->request()->getBody(), $assoc);
     }
 
+    public function getGenreById($genre_id) {
+        $list = $this->getCached("genre_list", "getList");
+
+
+        if (isset($list["genres"])) {
+            foreach($list["genres"] as $genre) {
+                if ($genre["id"] == $genre_id) {
+                    return $genre['name'];
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param $genre_name
+     *
+     * @return bool|int|string
+     */
+    public function getGenreIdByName($genre_name) {
+        $list = $this->getCached("genre_list", "getList");
+
+        if (isset($list["genres"])) {
+            foreach($list["genres"] as $genre) {
+                if ($genre["name"] == $genre_name) {
+                    return $genre['id'];
+                }
+            }
+        }
+
+        return false;
+    }
+
+    public function getTotalMoviesInGenre($genre_id) {
+        $this->APIService->setEndpoint("genre/$genre_id/movies");
+        $response = json_decode($this->APIService->request()->getBody(), true);
+        return $response["total_pages"];
+    }
+
+    /**
+     * @return array
+     */
+    public function getCached($cachekey, $cachewith_function) {
+        $factory = \SS_Cache::factory("tmdb");
+        if (!($result = $factory->load($cachekey))) {
+            $result = $this->{$cachewith_function}();
+            $factory->save(serialize($result), $cachekey);
+        }
+
+        return (is_string($result)) ? unserialize($result) : $result;
+    }
 
 }
