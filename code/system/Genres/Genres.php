@@ -50,7 +50,6 @@ class Genres
      * Fetches the genre list from TheMovieDB.org
      *
      * @param string $language Default: en-US
-     * @param bool   $assoc    Returns the translated JSON string as an object (false), or an associative array (true)
      *
      * @return array
      */
@@ -67,7 +66,7 @@ class Genres
             )
         );
 
-        return json_decode($this->APIService->request()->getBody(), true);
+        return json_decode($this->APIService->request()->getBody(), TRUE);
     }
 
     /**
@@ -90,12 +89,25 @@ class Genres
         }
     }
 
-    public function getTotalMoviesInGenre($genreId)
+    /**
+     * Returns the total amount of movies currently in the specified genre
+     *
+     * @param string|int $search GenreId or Genre Name to valid existence of
+     *
+     * @return int
+     */
+    public function getTotalMoviesInGenre($search)
     {
-        $this->APIService->setEndpoint("genre/$genreId/movies");
+        $genre = $this->getGenre($search);
+
+        $this->APIService->setEndpoint("genre/{$genre['id']}/movies");
         $response = json_decode($this->APIService->request()->getBody(), TRUE);
 
-        return $response[ "total_results" ];
+        if (array_key_exists("total_results", $response)) {
+            return $response[ "total_results" ];
+        }
+
+        throw new \RuntimeException("total_results key does not exist in payload");
     }
 
     /**
@@ -114,6 +126,20 @@ class Genres
         }
 
         return (is_string($result)) ? unserialize($result) : $result;
+    }
+
+    /**
+     * Validates whether or not the given input is a valid GenreId or Genre Name
+     *
+     * @param string|int $search GenreId or Genre Name to valid existence of
+     *
+     * @return bool
+     */
+    public function isValidGenre($search)
+    {
+        $result = $this->getGenre($search);
+
+        return (array_key_exists("name", $result));
     }
 
 }
