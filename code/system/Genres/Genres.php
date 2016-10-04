@@ -70,38 +70,23 @@ class Genres
         return $result = json_decode($this->APIService->request()->getBody(), $assoc);
     }
 
-    public function getGenreById($genre_id) {
-        $list = $this->getCached("genre_list", "getList");
-
-
-        if (isset($list["genres"])) {
-            foreach($list["genres"] as $genre) {
-                if ($genre["id"] == $genre_id) {
-                    return $genre['name'];
-                }
-            }
-        }
-
-        return false;
-    }
-
     /**
-     * @param $genre_name
+     * Gets a particular GenreID => Name mapping
      *
-     * @return bool|int|string
+     * @param string|int $search Can be either the external genre ID (eg 28) or string (eg 'Action')
+     *
+     * @return mixed
      */
-    public function getGenreIdByName($genre_name) {
+    public function getGenre($search) {
         $list = $this->getCached("genre_list", "getList");
 
         if (isset($list["genres"])) {
             foreach($list["genres"] as $genre) {
-                if ($genre["name"] == $genre_name) {
-                    return $genre['id'];
+                if ($genre["id"] == $search || $genre["name"] == $search) {
+                    return $genre;
                 }
             }
         }
-
-        return false;
     }
 
     public function getTotalMoviesInGenre($genre_id) {
