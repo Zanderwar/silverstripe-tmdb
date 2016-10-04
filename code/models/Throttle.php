@@ -14,7 +14,7 @@
  */
 
 class Throttle extends DataObject {
-    private static $db = array(
+    protected static $db = array(
         "Requests" => "Int",
         "LastRequest" => "Int",
         "FirstRequest" => "Int"

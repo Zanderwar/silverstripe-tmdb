@@ -50,11 +50,11 @@ class Genres
      * Fetches the genre list from TheMovieDB.org
      *
      * @param string $language Default: en-US
-     * @param bool   $assoc Returns the translated JSON string as an object (false), or an associative array (true)
+     * @param bool   $assoc    Returns the translated JSON string as an object (false), or an associative array (true)
      *
      * @return array
      */
-    public function getList($language = null, $assoc = true)
+    public function getList($language = NULL)
     {
         if (is_null($language)) {
             $language = str_replace("_", "-", \i18n::get_locale());
@@ -67,7 +67,7 @@ class Genres
             )
         );
 
-        return $result = json_decode($this->APIService->request()->getBody(), $assoc);
+        return json_decode($this->APIService->request()->getBody());
     }
 
     /**
@@ -77,32 +77,40 @@ class Genres
      *
      * @return mixed
      */
-    public function getGenre($search) {
+    public function getGenre($search)
+    {
         $list = $this->getCached("genre_list", "getList");
 
-        if (isset($list["genres"])) {
-            foreach($list["genres"] as $genre) {
-                if ($genre["id"] == $search || $genre["name"] == $search) {
+        if (isset($list[ "genres" ])) {
+            foreach ($list[ "genres" ] as $genre) {
+                if ($genre[ "id" ] == $search || $genre[ "name" ] == $search) {
                     return $genre;
                 }
             }
         }
     }
 
-    public function getTotalMoviesInGenre($genre_id) {
-        $this->APIService->setEndpoint("genre/$genre_id/movies");
-        $response = json_decode($this->APIService->request()->getBody(), true);
-        return $response["total_pages"];
+    public function getTotalMoviesInGenre($genreId)
+    {
+        $this->APIService->setEndpoint("genre/$genreId/movies");
+        $response = json_decode($this->APIService->request()->getBody(), TRUE);
+
+        return $response[ "total_results" ];
     }
 
     /**
-     * @return array
+     * @param string $cacheKey       The cache key that we're looking for
+     * @param string $callback       The function name that the cache factory will be filled with if not found
+     * @param array  $callbackParams Each required param of the callback function in an array
+     *
+     * @return mixed
      */
-    public function getCached($cachekey, $cachewith_function) {
+    public function getCached($cacheKey, $callback, $callbackParams = array())
+    {
         $factory = \SS_Cache::factory("tmdb");
-        if (!($result = $factory->load($cachekey))) {
-            $result = $this->{$cachewith_function}();
-            $factory->save(serialize($result), $cachekey);
+        if (!($result = $factory->load($cacheKey))) {
+            $result = call_user_func_array(array( $this, $callback ), $callbackParams);
+            $factory->save(serialize($result), $cacheKey);
         }
 
         return (is_string($result)) ? unserialize($result) : $result;

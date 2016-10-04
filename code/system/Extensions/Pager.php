@@ -133,7 +133,7 @@ class Pager
         // we record the current page here in SyncMemory before incrementing, in case sync is interrupted half
         // way through next page. We don't care for the first page for obvious reasons
         if (isset(static::$memoryKey) && self::$currentPage > 1) {
-            $mem_key = static::$memoryKey;
+            $memKey = static::$memoryKey;
             $memory  = \SyncMemory::get()->first();
 
             if (!$memory) {
@@ -141,7 +141,7 @@ class Pager
             }
 
             /** @todo work out how to check if $mem_key is actually a column */
-            $memory->{$mem_key} = self::$currentPage;
+            $memory->{$memKey} = self::$currentPage;
             $memory->write();
         }
 
@@ -225,17 +225,17 @@ class Pager
      *                           );
      *                           ```
      *
-     * @param null|int $set_time_limit  Sets the maximum execution time for a script. Default: php.ini setting
+     * @param null|int $maxRuntime      Sets the maximum execution time for a script. Default: php.ini setting
      *
      * @todo very cyclomatic, try to reduce entry points
      *
      * @return $this
      */
-    public function init($formatVars = array(), $set_time_limit = NULL)
+    public function init($formatVars = array(), $maxRuntime = NULL)
     {
         // I would like to discuss this if anyone has something constructive
-        if (!is_null($set_time_limit) && is_integer($set_time_limit)) {
-            set_time_limit($set_time_limit);
+        if (!is_null($maxRuntime) && is_integer($maxRuntime)) {
+            set_time_limit($maxRuntime);
         }
 
         // if the developer provides this function with $format_vars, but no $endpoint_format has been provided by the

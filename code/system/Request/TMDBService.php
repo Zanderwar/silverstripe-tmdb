@@ -26,7 +26,7 @@ class TMDBService extends \RestfulService {
      *
      * @var int
      */
-    protected static $maxRequestsInDuration = 10;
+    protected static $durationThreshold = 10;
 
     /**
      * TheMovieDB.org API Key
@@ -117,11 +117,11 @@ class TMDBService extends \RestfulService {
         $diff = time() - $this->getThrottle()->FirstRequest;
 
         // rodeo time...
-        while (($this->getThrottle()->Requests >= self::$maxRequests) || $diff >= self::$maxRequestsInDuration)
+        while (($this->getThrottle()->Requests >= self::$maxRequests) || $diff >= self::$durationThreshold)
         {
             $diff = time() - $this->getThrottle()->FirstRequest; // im repeating myself, can't remove it either - looks can be deceiving :(
 
-            if ($diff >= self::$maxRequestsInDuration) {
+            if ($diff >= self::$durationThreshold) {
                 // the app has been a good boy and has been punished long enough!
                 $throttle = $this->getThrottle();
                 $throttle->Requests = 0;
