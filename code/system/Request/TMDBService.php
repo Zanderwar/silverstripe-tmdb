@@ -144,7 +144,8 @@ class TMDBService extends \RestfulService {
      */
     public function request($subURL = '', $method = "GET", $data = null, $headers = null, $curlOptions = array()) {
 
-        $this->runThrottle(); // pauses script execution until another request can be made
+        // we don't want the throttle to run when Travic-CI is build testing
+        if (getenv("IS_TRAVIS") == "true") { $this->runThrottle(); }// pauses script execution until another request can be made
 
         // convert parents query string back into an array
         parse_str($this->queryString, $params);
@@ -164,7 +165,7 @@ class TMDBService extends \RestfulService {
         $result = parent::request();
 
         // increment the throttle counter
-        $this->incThrottle();
+        if (getenv("IS_TRAVIS") == "true") { $this->incThrottle(); }
 
         // check if the request is unauthorized (usually bad api key)
         if ($result->getStatusCode() == 401) {
