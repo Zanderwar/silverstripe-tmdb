@@ -13,21 +13,20 @@ class GenreTest extends FunctionalTest {
      * Test \TMDB\Genres::inst()->getGenreById(28) and assert that "Action" is returned
      */
     public function testGetGenreById() {
-        $result = \TMDB\Genres::inst()->getGenreById(28);
+        $result = (int)\TMDB\Genres::inst()->getGenre(28);
 
-        $this->assertTrue($result == "Action");
-    }
+        // assert that the key "id" is in the result
+        $this->assertTrue(array_key_exists("id", $result));
 
-    /**
-     * Test \TMDB\Genres::inst()->getGenreIdByName("Action") and assert that 28 is returned
-     */
-    public function testGetGenreIdByName() {
-        $result = \TMDB\Genres::inst()->getGenreIdByName("Action");
+        // assert that the key "name" is in the result
+        $this->assertTrue(array_key_exists("name", $result));
 
+        // asset that $result["name"] == 'Action'
+        $this->assertTrue($result["name"] == "Action");
+
+        // assert that the string to id conversion is working
+        $result = (int)\TMDB\Genres::inst()->getGenre('Action');
         $this->assertTrue($result == 28);
-    }
-    
-    public function testGetTotalMoviesInGenre() {
-        $result = \TMDB\Genres::inst()->getTotalMoviesInGenre(28);
+
     }
 }
