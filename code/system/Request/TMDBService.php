@@ -165,7 +165,7 @@ class TMDBService extends \RestfulService {
         $result = parent::request();
 
         // increment the throttle counter
-        if (getenv("IS_TRAVIS") != "true") { $this->incThrottle(); }
+        if (getenv("IS_TRAVIS") != "YES") { $this->incThrottle(); }
 
         // check if the request is unauthorized (usually bad api key)
         if ($result->getStatusCode() == 401) {
