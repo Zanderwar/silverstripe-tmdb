@@ -12,28 +12,28 @@ class TMDBService extends \RestfulService {
      *
      * @var string
      */
-    protected static $api_url = "http://api.themoviedb.org/3/"; // version 3
+    protected static $apiUrl = "http://api.themoviedb.org/3/"; // version 3
 
     /**
      * Max Requests
      *
      * @var int
      */
-    protected static $max_requests = 40;
+    protected static $maxRequests = 40;
 
     /**
      * Seconds
      *
      * @var int
      */
-    protected static $max_requests_in_duration = 10;
+    protected static $maxRequestsInDuration = 10;
 
     /**
      * TheMovieDB.org API Key
      * 
      * @var string
      */
-    private static $api_key;
+    private static $apiKey;
 
     /**
      * The endpoint (eg "movies", "genres/movies/list")
@@ -45,22 +45,22 @@ class TMDBService extends \RestfulService {
     /**
      * @var int
      */
-    protected $cache_expire = 0;
+    protected $cacheExpire = 0;
 
     /**
      * APIService constructor.
      *
-     * @param null   $cache_expiry
+     * @param null $cacheExpiry
      */
-    function __construct($cache_expiry=NULL){
-        $api_key = \Config::inst()->get("TMDB", "api_key") ?: getenv("TMDB_API_KEY");
+    function __construct($cacheExpiry=NULL){
+        $apiKey = \Config::inst()->get("TMDB", "api_key") ?: getenv("TMDB_API_KEY");
 
-        if (!isset($api_key) || !strlen($api_key)) {
+        if (!isset($apiKey) || !strlen($apiKey)) {
             user_error("You must provide your own TheMovieDB.org API key");
         }
 
-        self::$api_key = $api_key;
-        parent::__construct(self::$api_url, $cache_expiry);
+        self::$apiKey = $apiKey;
+        parent::__construct(self::$apiUrl, $cacheExpiry);
     }
 
     /**
@@ -117,11 +117,11 @@ class TMDBService extends \RestfulService {
         $diff = time() - $this->getThrottle()->FirstRequest;
 
         // rodeo time...
-        while (($this->getThrottle()->Requests >= self::$max_requests) || $diff >= self::$max_requests_in_duration)
+        while (($this->getThrottle()->Requests >= self::$maxRequests) || $diff >= self::$maxRequestsInDuration)
         {
             $diff = time() - $this->getThrottle()->FirstRequest; // im repeating myself, can't remove it either - looks can be deceiving :(
 
-            if ($diff >= self::$max_requests_in_duration) {
+            if ($diff >= self::$maxRequestsInDuration) {
                 // the app has been a good boy and has been punished long enough!
                 $throttle = $this->getThrottle();
                 $throttle->Requests = 0;
@@ -140,6 +140,14 @@ class TMDBService extends \RestfulService {
     }
 
     /**
+     * We override request here to inject our API_KEY into the queryString and also to throttle the rate of requests
+     *
+     * @param string $subURL See `RestfulService::request()`
+     * @param string $method See `RestfulService::request()`
+     * @param null   $data See `RestfulService::request()`
+     * @param null   $headers See `RestfulService::request()`
+     * @param array  $curlOptions See `RestfulService::request()`
+     *
      * @return \RestfulService_Response
      */
     public function request($subURL = '', $method = "GET", $data = null, $headers = null, $curlOptions = array()) {
@@ -157,12 +165,12 @@ class TMDBService extends \RestfulService {
 
         // if api_key is not in the array, add it
         if (!array_key_exists("api_key", $params)) {
-            $params['api_key'] = static::$api_key;
+            $params['api_key'] = static::$apiKey;
             $this->setQueryString($params);
         }
 
         // fetch a response
-        $result = parent::request();
+        $result = parent::request($subURL, $method, $data, $headers, $curlOptions);
 
         // increment the throttle counter
         if (getenv("IS_TRAVIS") != "YES") { $this->incThrottle(); }
@@ -179,10 +187,10 @@ class TMDBService extends \RestfulService {
     /**
      * Modify the baseURL set by \RestfulService on construct
      *
-     * @param $base_url
+     * @param $baseUrl
      */
-    public function setBaseUrl($base_url) {
-        $this->baseURL = $base_url;
+    public function setBaseUrl($baseUrl) {
+        $this->baseURL = $baseUrl;
     }
 
     /**
@@ -196,7 +204,7 @@ class TMDBService extends \RestfulService {
         // trim starting slash
         $endpoint = ltrim($endpoint, "/");
 
-        $this->setBaseUrl(self::$api_url . $endpoint);
+        $this->setBaseUrl(self::$apiUrl . $endpoint);
     }
 
 }
