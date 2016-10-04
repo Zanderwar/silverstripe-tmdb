@@ -13,7 +13,7 @@ class GenreTest extends FunctionalTest {
      * Test \TMDB\Genres::inst()->getGenreById(28) and assert that "Action" is returned
      */
     public function testGetGenreById() {
-        $result = (int)\TMDB\Genres::inst()->getGenre(28);
+        $result = \TMDB\Genres::inst()->getGenre(28);
 
         // assert that the key "id" is in the result
         $this->assertTrue(array_key_exists("id", $result));
@@ -25,8 +25,8 @@ class GenreTest extends FunctionalTest {
         $this->assertTrue($result["name"] == "Action");
 
         // assert that the string to id conversion is working
-        $result = (int)\TMDB\Genres::inst()->getGenre('Action');
-        $this->assertTrue($result == 28);
+        $result = \TMDB\Genres::inst()->getGenre('Action');
+        $this->assertTrue($result["id"] == 28);
 
     }
 }
