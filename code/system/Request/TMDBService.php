@@ -5,7 +5,8 @@ namespace TMDB\Request;
  * Class APIService
  * @package TMDB\Request
  */
-class TMDBService extends \RestfulService {
+class TMDBService extends \RestfulService
+{
 
     /**
      * TheMovieDB.org API Url
@@ -30,7 +31,7 @@ class TMDBService extends \RestfulService {
 
     /**
      * TheMovieDB.org API Key
-     * 
+     *
      * @var string
      */
     private static $apiKey;
@@ -52,7 +53,8 @@ class TMDBService extends \RestfulService {
      *
      * @param null $cacheExpiry
      */
-    function __construct($cacheExpiry=NULL){
+    function __construct($cacheExpiry = NULL)
+    {
         $apiKey = \Config::inst()->get("TMDB", "api_key") ?: getenv("TMDB_API_KEY");
 
         if (!isset($apiKey) || !strlen($apiKey)) {
@@ -68,7 +70,8 @@ class TMDBService extends \RestfulService {
      *
      * @return \DataObject
      */
-    private function getThrottle() {
+    private function getThrottle()
+    {
         $throttle = \Throttle::get()->first();
 
         if (!$throttle) {
@@ -83,7 +86,8 @@ class TMDBService extends \RestfulService {
      *
      * @return bool
      */
-    private function incThrottle() {
+    private function incThrottle()
+    {
         $throttle = $this->getThrottle();
 
         $requests = $throttle->Requests;
@@ -95,21 +99,27 @@ class TMDBService extends \RestfulService {
 
         $requests++;
 
-        $throttle->Requests = $requests;
+        $throttle->Requests    = $requests;
         $throttle->LastRequest = time();
 
-        return ($throttle->write()) ? true : false;
+        return ($throttle->write()) ? TRUE : FALSE;
     }
 
     /**
      * Pauses script execution until another request can be made. Open to opinions or a PR?
      *
-     * @note This is only used by server, and "should not" at any point in time be invoked by a visitor
+     * Testing on localhost, the request count could not get higher than 5 before resetting back to zero, though that
+     * could very well be due to the crappy internet in Australia
+     *
+     * Yet to test on production
+     *
+     * @note  This is only used by server, and "should not" at any point in time be invoked by a visitor
      * @label help-wanted
      *
      * @return void
      */
-    private function runThrottle() {
+    private function runThrottle()
+    {
 
         // give the little guy something to count
         $i = 0;
@@ -117,13 +127,12 @@ class TMDBService extends \RestfulService {
         $diff = time() - $this->getThrottle()->FirstRequest;
 
         // rodeo time...
-        while (($this->getThrottle()->Requests >= self::$maxRequests) || $diff >= self::$durationThreshold)
-        {
+        while (($this->getThrottle()->Requests >= self::$maxRequests) || $diff >= self::$durationThreshold) {
             $diff = time() - $this->getThrottle()->FirstRequest; // im repeating myself, can't remove it either - looks can be deceiving :(
 
             if ($diff >= self::$durationThreshold) {
                 // the app has been a good boy and has been punished long enough!
-                $throttle = $this->getThrottle();
+                $throttle           = $this->getThrottle();
                 $throttle->Requests = 0;
                 $throttle->write();
 
@@ -142,18 +151,21 @@ class TMDBService extends \RestfulService {
     /**
      * We override request here to inject our API_KEY into the queryString and also to throttle the rate of requests
      *
-     * @param string $subURL See `RestfulService::request()`
-     * @param string $method See `RestfulService::request()`
-     * @param null   $data See `RestfulService::request()`
-     * @param null   $headers See `RestfulService::request()`
+     * @param string $subURL      See `RestfulService::request()`
+     * @param string $method      See `RestfulService::request()`
+     * @param null   $data        See `RestfulService::request()`
+     * @param null   $headers     See `RestfulService::request()`
      * @param array  $curlOptions See `RestfulService::request()`
      *
      * @return \RestfulService_Response
      */
-    public function request($subURL = '', $method = "GET", $data = null, $headers = null, $curlOptions = array()) {
+    public function request($subURL = '', $method = "GET", $data = NULL, $headers = NULL, $curlOptions = array())
+    {
 
         // we don't want the throttle to run when Travic-CI is build testing
-        if (getenv("IS_TRAVIS") != "YES") { $this->runThrottle(); }// pauses script execution until another request can be made
+        if (getenv("IS_TRAVIS") != "YES") {
+            $this->runThrottle();
+        }// pauses script execution until another request can be made
 
         // convert parents query string back into an array
         parse_str($this->queryString, $params);
@@ -165,7 +177,7 @@ class TMDBService extends \RestfulService {
 
         // if api_key is not in the array, add it
         if (!array_key_exists("api_key", $params)) {
-            $params['api_key'] = static::$apiKey;
+            $params[ 'api_key' ] = static::$apiKey;
             $this->setQueryString($params);
         }
 
@@ -173,7 +185,9 @@ class TMDBService extends \RestfulService {
         $result = parent::request($subURL, $method, $data, $headers, $curlOptions);
 
         // increment the throttle counter
-        if (getenv("IS_TRAVIS") != "YES") { $this->incThrottle(); }
+        if (getenv("IS_TRAVIS") != "YES") {
+            $this->incThrottle();
+        }
 
         // check if the request is unauthorized (usually bad api key)
         if ($result->getStatusCode() == 401) {
@@ -189,7 +203,8 @@ class TMDBService extends \RestfulService {
      *
      * @param $baseUrl
      */
-    public function setBaseUrl($baseUrl) {
+    public function setBaseUrl($baseUrl)
+    {
         $this->baseURL = $baseUrl;
     }
 
@@ -198,7 +213,8 @@ class TMDBService extends \RestfulService {
      *
      * @param $endpoint
      */
-    public function setEndpoint($endpoint) {
+    public function setEndpoint($endpoint)
+    {
         self::$endpoint = $endpoint;
 
         // trim starting slash

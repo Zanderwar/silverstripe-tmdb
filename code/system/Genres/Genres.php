@@ -139,8 +139,6 @@ class Genres
     {
         $result = $this->getGenre($search);
 
-
-
         return (is_array($result) && array_key_exists("name", $result));
     }
 
