@@ -10,7 +10,8 @@ php:
   - 5.5
   - 5.6
 env:
-  - DB=MYSQL CORE_RELEASE=3.2
+  - DB=MYSQL
+  - CORE_RELEASE=3.2
   - CODECLIMATE_REPO_TOKEN=fb64d1a5f02d64e8cd9cf9d8f528fb2b1559cecdc8aaf818cbbf9e0a21a2333d ./vendor/bin/test-reporter
 
 matrix:
