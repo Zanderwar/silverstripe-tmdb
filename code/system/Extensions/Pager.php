@@ -2,6 +2,7 @@
 namespace TMDB\Extensions;
 
 use TMDB\Request\APIService;
+use TMDB\Request\TMDBService;
 
 class Pager
 {
@@ -9,7 +10,7 @@ class Pager
      * Sets the default query string for the pager
      * @var string|null
      */
-    protected static $query_string;
+    protected static $queryString;
 
     /**
      * @var string
@@ -19,50 +20,50 @@ class Pager
     /**
      * If the endpoint requires some dynamic value then you can define it here. If set, $endpoint is ignored.
      *
-     * @see     TMDB\Extensions\Pager::$format_search
-     * @see     TMDB\Extensions\Pager::$format_replace
-     * @see     TMDB\Extensions\Pager::init()
+     * @see     \TMDB\Extensions\Pager::$format_search
+     * @see     \TMDB\Extensions\Pager::$format_replace
+     * @see     \TMDB\Extensions\Pager::init()
      *
      * @example "genres/{genre_id}/movies"
      *
      * @var
      */
-    protected static $endpoint_format;
+    protected static $endpointFormat;
 
     /**
      * Total discovered pages
      *
      * @var int|null
      */
-    protected static $total_pages = NULL;
+    protected static $totalPages = NULL;
 
     /**
      * The page to start on (if sync is interrupted, we can grab last page from here)
      *
      * @var int
      */
-    protected static $starting_page;
+    protected static $startingPage;
 
     /**
      * The key used for SyncMemory to recover from sync interruption
      *
      * @var string
      */
-    protected static $memory_key;
+    protected static $memoryKey;
 
     /**
      * Current Page
      *
      * @var int|null
      */
-    protected static $current_page = NULL;
+    protected static $currentPage = NULL;
 
     /**
      * Stores the TheMovieDB.org response for the current page
      *
      * @var array
      */
-    protected static $current_page_data;
+    protected static $currentPageData;
 
     /**
      * Total results
@@ -72,17 +73,17 @@ class Pager
     protected static $count = NULL;
 
     /**
-     * @var \TMDB\Request\APIService
+     * @var \TMDB\Request\TMDBService
      */
-    protected $APIService;
+    protected $TMDBService;
 
     /**
      * Pager constructor.
      */
     public function __construct()
     {
-        if (!$this->APIService instanceof APIService) {
-            $this->APIService = new APIService();
+        if (!$this->TMDBService instanceof TMDBService) {
+            $this->TMDBService = new TMDBService();
         }
     }
 
@@ -103,7 +104,7 @@ class Pager
      */
     public static function getCurrentPage()
     {
-        return self::$current_page;
+        return self::$currentPage;
     }
 
     /**
@@ -121,52 +122,47 @@ class Pager
      *
      * @todo could probably clean this up with a DRY helper as it's prev() but in reverse
      *
-     * @return array
+     * @return array|bool
      */
     public function next()
     {
-        $current_page = self::$current_page;
-        $total_pages  = self::$total_pages;
-
-        if ($current_page >= $total_pages) {
+        if (self::$currentPage >= self::$totalPages) {
             return FALSE;
         }
 
         // we record the current page here in SyncMemory before incrementing, in case sync is interrupted half
         // way through next page. We don't care for the first page for obvious reasons
-        if (isset(static::$memory_key) && $current_page > 1) {
-            $mem_key = static::$memory_key;
-            $memory = \SyncMemory::get()->first();
+        if (isset(static::$memoryKey) && self::$currentPage > 1) {
+            $mem_key = static::$memoryKey;
+            $memory  = \SyncMemory::get()->first();
 
             if (!$memory) {
                 $memory = \SyncMemory::create();
             }
 
             /** @todo work out how to check if $mem_key is actually a column */
-            $memory->{$mem_key} = $current_page;
+            $memory->{$mem_key} = self::$currentPage;
             $memory->write();
         }
 
         // increment and continue building page request
-        $current_page++;
-        static::$query_string = array_merge(
-            static::$query_string,
+        self::$currentPage++;
+        static::$queryString = array_merge(
+            static::$queryString,
             array(
-                "page" => $current_page
+                "page" => self::$currentPage
             )
         );
 
-        $this->APIService->setQueryString(
-            static::$query_string
+        $this->TMDBService->setQueryString(
+            static::$queryString
         );
 
-        self::$current_page = $current_page;
-
-        $response = $this->APIService->request();
+        $response = $this->TMDBService->request();
         $json     = $response->getBody();
         $array    = json_decode($json, TRUE);
 
-        return self::$current_page_data = $array;
+        return self::$currentPageData = $array;
     }
 
     /**
@@ -176,7 +172,7 @@ class Pager
      */
     public function current()
     {
-        return self::$current_page_data;
+        return self::$currentPageData;
     }
 
     /**
@@ -184,41 +180,37 @@ class Pager
      *
      * @todo could probably clean this up with a DRY helper as its next() but in reverse
      *
-     * @return \ArrayList
+     * @return \ArrayList|bool
      */
     public function prev()
     {
-        $current_page = self::$current_page;
-
-        if ($current_page == 0) {
+        if (self::$currentPage == 0) {
             return FALSE;
         }
 
-        $current_page--;
-        static::$query_string = array_merge(
-            static::$query_string,
+        self::$currentPage--;
+        static::$queryString = array_merge(
+            static::$queryString,
             array(
-                "page" => $current_page
+                "page" => self::$currentPage
             )
         );
 
-        $this->APIService->setQueryString(
-            static::$query_string
+        $this->TMDBService->setQueryString(
+            static::$queryString
         );
 
-        self::$current_page = $current_page;
-
-        $response = $this->APIService->request();
+        $response = $this->TMDBService->request();
         $json     = $response->getBody();
         $array    = json_decode($json, TRUE);
 
-        return self::$current_page_data = $array;
+        return self::$currentPageData = $array;
     }
 
     /**
      * Init the pager and loads the first page into memory
      *
-     * @param array $format_vars        Only provide this if you have defined `$endpoint_format` in your class
+     * @param array    $formatVars      Only provide this if you have defined `$endpoint_format` in your class
      *                                  Example:
      *                                  ```
      *                                  class YourClass extends Pager {
@@ -233,35 +225,37 @@ class Pager
      *                           );
      *                           ```
      *
-     * @param null  $max_execution_time Sets the maximum execution time for a script. Default: php.ini setting
+     * @param null|int $set_time_limit  Sets the maximum execution time for a script. Default: php.ini setting
+     *
+     * @todo very cyclomatic, try to reduce entry points
      *
      * @return $this
      */
-    public function init($format_vars = array(), $max_execution_time = NULL)
+    public function init($formatVars = array(), $set_time_limit = NULL)
     {
         // I would like to discuss this if anyone has something constructive
-        if (!is_null($max_execution_time) && is_integer($max_execution_time)) {
-            set_time_limit($max_execution_time);
+        if (!is_null($set_time_limit) && is_integer($set_time_limit)) {
+            set_time_limit($set_time_limit);
         }
 
         // if the developer provides this function with $format_vars, but no $endpoint_format has been provided by the
         // inheriting class then throw error
-        if (!empty($format_vars) && !isset(static::$endpoint_format)) {
+        if (!empty($formatVars) && !isset(static::$endpointFormat)) {
             throw new \RuntimeException("You have provided the \$format_vars parameter with an array, however no \$endpoint_format has been set in " . get_called_class());
         }
 
         // if it has been provided, and no in correct associative format then throw error
-        if (!empty($format_vars) && !\ArrayLib::is_associative($format_vars)) {
+        if (!empty($formatVars) && !\ArrayLib::is_associative($formatVars)) {
             throw new \RuntimeException("You have provided the \$format_vars parameter with an array, however it is not in correct format. Please see the PHPDoc for Pager::init()");
         }
 
         // if it has been provided, and in correct associative format then parse $endpoint_format
-        if (!empty($format_vars) && \ArrayLib::is_associative($format_vars)) {
+        if (!empty($formatVars) && \ArrayLib::is_associative($formatVars)) {
 
-            $format_search  = array_map(function ($input) { return "{" . $input . "}"; }, array_keys($format_vars));
-            $format_replace = array_values($format_vars);
+            $formatSearch  = array_map(function ($input) { return "{" . $input . "}"; }, array_keys($formatVars));
+            $formatReplace = array_values($formatVars);
 
-            static::$endpoint = str_replace($format_search, $format_replace, static::$endpoint_format);
+            static::$endpoint = str_replace($formatSearch, $formatReplace, static::$endpointFormat);
         }
 
         // if we still don't have an endpoint after all that then throw error
@@ -283,27 +277,20 @@ class Pager
     public function getFirstOrStartingPage()
     {
         // set endpoint
-        $this->APIService->setEndpoint(static::$endpoint);
+        $this->TMDBService->setEndpoint(static::$endpoint);
 
         // set query string
-        if (isset(static::$starting_page)) {
-            $this->APIService->setQueryString(
-                array_merge(
-                    static::$query_string,
-                    array(
-                        "page" => static::$starting_page
-                    )
-                )
-            );
-        }
-        else {
-            $this->APIService->setQueryString(
-                static::$query_string
-            );
-        }
+        $params = array_merge(
+            static::$queryString,
+            array(
+                "page" => (isset(static::$startingPage)) ? static::$startingPage : 1
+            )
+        );
+
+        $this->TMDBService->setQueryString($params);
 
         // fetch a response
-        $response = $this->APIService->request();
+        $response = $this->TMDBService->request();
         $json     = $response->getBody();
         $array    = json_decode($json, TRUE);
 
@@ -313,10 +300,10 @@ class Pager
         }
 
         // setup required class variables
-        self::$current_page      = $array[ "page" ];
-        self::$count             = $array[ "total_results" ];
-        self::$total_pages       = $array[ "total_pages" ];
-        self::$current_page_data = $array;
+        self::$currentPage     = $array[ "page" ];
+        self::$count           = $array[ "total_results" ];
+        self::$totalPages      = $array[ "total_pages" ];
+        self::$currentPageData = $array;
 
         return $array;
     }
