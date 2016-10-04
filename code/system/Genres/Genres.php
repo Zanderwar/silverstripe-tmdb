@@ -67,7 +67,7 @@ class Genres
             )
         );
 
-        return json_decode($this->APIService->request()->getBody());
+        return json_decode($this->APIService->request()->getBody(), true);
     }
 
     /**
