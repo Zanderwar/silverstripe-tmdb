@@ -53,7 +53,7 @@ class TMDBService extends \RestfulService {
      * @param null   $cache_expiry
      */
     function __construct($cache_expiry=NULL){
-        $api_key = \Config::inst()->get("TMDB", "api_key");
+        $api_key = \Config::inst()->get("TMDB", "api_key") ?: getenv("TMDB_API_KEY");
 
         if (!isset($api_key) || !strlen($api_key)) {
             user_error("You must provide your own TheMovieDB.org API key");
