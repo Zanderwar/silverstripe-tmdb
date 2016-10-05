@@ -9,11 +9,25 @@ class TMDBService extends \RestfulService
 {
 
     /**
+     * Holds the JSON decoded response anytime request() is used
+     *
+     * @var array
+     */
+    public static $response;
+
+    /**
+     * Holds the \RestfulService_Response from request()
+     *
+     * @var \RestfulService_Response
+     */
+    public static $restfulResponse;
+
+    /**
      * TheMovieDB.org API Url
      *
      * @var string
      */
-    protected static $apiUrl = "http://api.themoviedb.org/3/"; // version 3
+    protected static $apiUrl = "http://api.themoviedb.org/3/";
 
     /**
      * Max Requests
@@ -30,18 +44,18 @@ class TMDBService extends \RestfulService
     protected static $durationThreshold = 10;
 
     /**
-     * TheMovieDB.org API Key
-     *
-     * @var string
-     */
-    private static $apiKey;
-
-    /**
      * The endpoint (eg "movies", "genres/movies/list")
      *
      * @var string
      */
     protected static $endpoint;
+
+    /**
+     * TheMovieDB.org API Key
+     *
+     * @var string
+     */
+    private static $apiKey;
 
     /**
      * @var int
@@ -66,43 +80,70 @@ class TMDBService extends \RestfulService
     }
 
     /**
-     * Returns the throttle record
+     * We override request here to inject our API_KEY into the queryString and also to throttle the rate of requests
      *
-     * @return \DataObject
+     * @param string $subURL      See `RestfulService::request()`
+     * @param string $method      See `RestfulService::request()`
+     * @param null   $data        See `RestfulService::request()`
+     * @param null   $headers     See `RestfulService::request()`
+     * @param array  $curlOptions See `RestfulService::request()`
+     *
+     * @return static
      */
-    private function getThrottle()
+    public function request($subURL = '', $method = "GET", $data = NULL, $headers = NULL, $curlOptions = array())
     {
-        $throttle = \Throttle::get()->first();
 
-        if (!$throttle) {
-            $throttle = \Throttle::create();
+        if (isset(static::$endpoint)) {
+            $this->setEndpoint(static::$endpoint);
         }
 
-        return $throttle;
+        // we don't want the throttle to run when Travic-CI is build testing
+        if (getenv("IS_TRAVIS") != "YES") {
+            $this->runThrottle();
+        }// pauses script execution until another request can be made
+
+        // convert parents query string back into an array
+        parse_str($this->queryString, $params);
+
+        // if null create the array
+        if (is_null($params)) {
+            $params = array();
+        }
+
+        // if api_key is not in the array, add it
+        if (!array_key_exists("api_key", $params)) {
+            $params[ 'api_key' ] = self::$apiKey;
+            $this->setQueryString($params);
+        }
+
+        // fetch a response
+        $result = parent::request($subURL, $method, $data, $headers, $curlOptions);
+
+        // increment the throttle counter
+        if (getenv("IS_TRAVIS") != "YES") {
+            $this->incThrottle();
+        }
+
+        // check if the request is unauthorized (usually bad api key)
+        if ($result->getStatusCode() == 401) {
+            $unauthorized = json_decode($result->getBody());
+            throw new \RuntimeException("TheMovieDB.org said: " . $unauthorized->status_message);
+        }
+
+        $this->setResponse($result);
+
+        return $this;
     }
 
     /**
-     * Increments the throttle counter
+     * Sets the correct baseUrl for the endpoint
      *
-     * @return bool
+     * @param $endpoint
      */
-    private function incThrottle()
+    public function setEndpoint($endpoint)
     {
-        $throttle = $this->getThrottle();
-
-        $requests = $throttle->Requests;
-
-        // if this is the first request getting made ($requests == 0) then let our model know
-        if (!(int)$requests) {
-            $throttle->FirstRequest = time();
-        }
-
-        $requests++;
-
-        $throttle->Requests    = $requests;
-        $throttle->LastRequest = time();
-
-        return ($throttle->write()) ? TRUE : FALSE;
+        $endpoint      = trim(ltrim($endpoint, "/"));
+        $this->baseURL = self::$apiUrl . $endpoint;
     }
 
     /**
@@ -149,78 +190,74 @@ class TMDBService extends \RestfulService
     }
 
     /**
-     * We override request here to inject our API_KEY into the queryString and also to throttle the rate of requests
+     * Returns the throttle record
      *
-     * @param string $subURL      See `RestfulService::request()`
-     * @param string $method      See `RestfulService::request()`
-     * @param null   $data        See `RestfulService::request()`
-     * @param null   $headers     See `RestfulService::request()`
-     * @param array  $curlOptions See `RestfulService::request()`
-     *
-     * @return \RestfulService_Response
+     * @return \DataObject
      */
-    public function request($subURL = '', $method = "GET", $data = NULL, $headers = NULL, $curlOptions = array())
+    private function getThrottle()
     {
+        $throttle = \Throttle::get()->first();
 
-        // we don't want the throttle to run when Travic-CI is build testing
-        if (getenv("IS_TRAVIS") != "YES") {
-            $this->runThrottle();
-        }// pauses script execution until another request can be made
-
-        // convert parents query string back into an array
-        parse_str($this->queryString, $params);
-
-        // if null create the array
-        if (is_null($params)) {
-            $params = array();
+        if (!$throttle) {
+            $throttle = \Throttle::create();
         }
 
-        // if api_key is not in the array, add it
-        if (!array_key_exists("api_key", $params)) {
-            $params[ 'api_key' ] = static::$apiKey;
-            $this->setQueryString($params);
-        }
-
-        // fetch a response
-        $result = parent::request($subURL, $method, $data, $headers, $curlOptions);
-
-        // increment the throttle counter
-        if (getenv("IS_TRAVIS") != "YES") {
-            $this->incThrottle();
-        }
-
-        // check if the request is unauthorized (usually bad api key)
-        if ($result->getStatusCode() == 401) {
-            $unauthorized = json_decode($result->getBody());
-            throw new \RuntimeException("TheMovieDB.org said: " . $unauthorized->status_message);
-        }
-
-        return $result;
+        return $throttle;
     }
 
     /**
-     * Modify the baseURL set by \RestfulService on construct
+     * Increments the throttle counter
      *
-     * @param $baseUrl
+     * @return bool
      */
-    public function setBaseUrl($baseUrl)
+    private function incThrottle()
     {
-        $this->baseURL = $baseUrl;
+        $throttle = $this->getThrottle();
+
+        $requests = $throttle->Requests;
+
+        // if this is the first request getting made ($requests == 0) then let our model know
+        if (!(int)$requests) {
+            $throttle->FirstRequest = time();
+        }
+
+        $requests++;
+
+        $throttle->Requests    = $requests;
+        $throttle->LastRequest = time();
+
+        return ($throttle->write()) ? TRUE : FALSE;
     }
 
     /**
-     * Sets the correct baseUrl for the endpoint
+     * Sets the response
      *
-     * @param $endpoint
+     * @param \RestfulService_Response $result
      */
-    public function setEndpoint($endpoint)
+    private function setResponse($result)
     {
-        self::$endpoint = $endpoint;
+        static::$restfulResponse = $result;
+        static::$response        = json_decode($result->getBody(), TRUE);
+    }
 
-        // trim starting slash
-        $endpoint = ltrim($endpoint, "/");
+    /**
+     * Gets the response
+     *
+     * @return array
+     */
+    public function getResponse()
+    {
+        return static::$response;
+    }
 
-        $this->setBaseUrl(self::$apiUrl . $endpoint);
+    /**
+     * Do we have a response?
+     *
+     * @return bool
+     */
+    public function hasResponse()
+    {
+        return (isset(static::$response));
     }
 
 }
