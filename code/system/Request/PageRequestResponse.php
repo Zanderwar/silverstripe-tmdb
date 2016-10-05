@@ -46,5 +46,5 @@ class PageRequestResponse {
     public static function getTotalResults()
     {
         return self::$totalResults;
-    }
+    } 
 }
