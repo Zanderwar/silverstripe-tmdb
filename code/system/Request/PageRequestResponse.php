@@ -47,10 +47,4 @@ class PageRequestResponse {
     {
         return self::$totalResults;
     }
-
-    public function __toString()
-    {
-        return 'wtf';
-        // TODO: Implement __toString() method.
-    }
 }
