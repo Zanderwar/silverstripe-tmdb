@@ -21,19 +21,19 @@ class Genres
     protected static $multiton = array();
 
     /**
-     * Returns default instance store if no parameter provided (if default instance does not exist, will create)
+     * Multiton Instance Store
      *
-     * @param string $key
+     * @param string $key Custom instance key
      *
      * @return $this
      */
     public static function inst($key = "_MASTER")
     {
-        if (isset(static::$multiton[ $key ]) && is_object(static::$multiton[ $key ])) {
+        $class = get_called_class();
+
+        if (isset(static::$multiton[ $key ]) && static::$multiton[ $key ] instanceof $class) {
             return static::$multiton[ $key ];
         }
-
-        $class = get_called_class();
 
         return static::$multiton[ $key ] = new $class();
     }
@@ -43,7 +43,7 @@ class Genres
      */
     public function __construct()
     {
-        $this->APIService = new TMDBService();
+        $this->TMDBService = new TMDBService();
     }
 
     /**
@@ -59,14 +59,14 @@ class Genres
             $language = str_replace("_", "-", \i18n::get_locale());
         }
 
-        $this->APIService->setEndpoint("genre/movie/list");
-        $this->APIService->setQueryString(
+        $this->TMDBService->setEndpoint("genre/movie/list");
+        $this->TMDBService->setQueryString(
             array(
                 "language" => $language
             )
         );
 
-        return json_decode($this->APIService->request()->getBody(), TRUE);
+        return $this->TMDBService->request()->getResponse();
     }
 
     /**
@@ -100,9 +100,8 @@ class Genres
     {
         $genre = $this->getGenre($search);
 
-        $this->APIService->setEndpoint("genre/{$genre['id']}/movies");
-        $response = json_decode($this->APIService->request()->getBody(), TRUE);
-
+        $this->TMDBService->setEndpoint("genre/{$genre['id']}/movies");
+        $response = $this->TMDBService->request()->getResponse();
         if (array_key_exists("total_results", $response)) {
             return $response[ "total_results" ];
         }
